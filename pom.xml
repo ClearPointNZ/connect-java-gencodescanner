@@ -3,7 +3,7 @@
 
 	<groupId>cd.connect.common</groupId>
 	<artifactId>connect-gen-code-scanner</artifactId>
-	<version>1.1</version>
+	<version>1.2-SNAPSHOT</version>
 	<name>connect-gen-code-scanner</name>
 	<description>Scans the source base and generates new source for code generation</description>
 
@@ -31,7 +31,7 @@
 		<connection>scm:git:git@github.com:clearpointnz/connect-gen-code-scanner.git</connection>
 		<developerConnection>scm:git:git@github.com:clearpointnz/connect-gen-code-scanner.git</developerConnection>
 		<url>git@github.com:clearpointnz/connect-/gen-code-scanner.git</url>
-		<tag>connect-gen-code-scanner-1.1</tag>
+		<tag>HEAD</tag>
 	</scm>
 
 	<properties>
