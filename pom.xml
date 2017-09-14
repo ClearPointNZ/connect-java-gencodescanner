@@ -9,6 +9,24 @@
 
 	<packaging>maven-plugin</packaging>
 
+
+	<url>https://clearpointnz.github.io/connect/</url>
+	<developers>
+		<developer>
+			<email>richard@bluetrainsoftware.com</email>
+			<id>rvowles</id>
+			<name>Richard Vowles</name>
+			<organization>bluetrainsoftware</organization>
+		</developer>
+	</developers>
+
+	<licenses>
+		<license>
+			<name>Apache License 2.0</name>
+			<url>https://opensource.org/licenses/Apache-2.0</url>
+		</license>
+	</licenses>
+
 	<scm>
 		<connection>scm:git:git@github.com:clearpointnz/connect-gen-code-scanner.git</connection>
 		<developerConnection>scm:git:git@github.com:clearpointnz/connect-gen-code-scanner.git</developerConnection>
