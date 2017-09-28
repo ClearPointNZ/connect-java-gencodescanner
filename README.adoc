@@ -121,14 +121,14 @@ and you wished to grab all of the classes in the sub packages `dao`, `security` 
 and put them in the `spring` _group_, but no other sub-packages, you could do this:
 
 ----
-<package>cd.connect.samples.slackapp=spring: dao, security, spring</package>
+<package>cd.connect.samples.slackapp=spring: dao, security, rest</package>
 ----
 
 _groups_ are instances of the java `Set` class, so they won't duplicate. If you then wanted
 to ensure all of your @Singleton annotated classes were picked up as well, you could add
 
 ----
-<package>cd.connect.samples.slackapp=spring: dao, security, spring</package>
+<package>cd.connect.samples.slackapp=spring: dao, security, rest</package>
 <package>cd.connect.samples.slackapp=spring/@Singleton</package>
 ----
 
