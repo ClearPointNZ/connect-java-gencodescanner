@@ -1,0 +1,296 @@
+= connect-java-gencodescanner
+Compile time classpath scanner for Java.
+
+== Description
+
+This tool was created to address a problem experienced when developing Microservice applications under Spring.
+
+=== The Problem
+
+In a Microservice, the time the application takes to start is paramount. But further because a Microservice
+is starting in a cluster with other already running services, it must be a good *neighbour*. It cannot start and
+suddenly consume all of the CPU on the server it is running on, starving the other services of resources.
+
+As such, Microservices must be started with a resource limtation on their CPU to prevent this from happening, but you
+don't want this to be too high otherwise your scheduler will under-utilize a server and you come back to the problem
+of starving neighbours of resources.
+
+Resource limits, especially in schedulers like Kubernetes act as horizontal scaling indicators as well. So you need
+to ensure you set your resource requirements so that the scheduler will trigger a scale out if a CPU ratio is hit
+for a specific period of time.
+
+For this reason, it is extremely important that your Microservice starts as quickly as possible with as little CPU as
+possible. Microservices need to be as _deliberate_ as possible in their use of resources, and typical development models
+that hand you an "easy to use framework" generally make you less deliberate.
+
+We try and give our Microservices a limit of 400-500 millicores of CPU. A service should be able to start in less
+than 30 seconds with this limitation as long as it isn't trying to do database migrations or similar sorts of things.
+
+=== Being _Deliberate_
+
+Our Spring applications, like most Spring applications used classpath scanning. Every single time a full classpath
+scan has to happen, tens of thousands of classes have to be evaluated to see if they meet a specific criteria. This
+often happens multiple times as Spring has encouraged developers over time to simplify their wiring this way.
+
+This ends up using considerable CPU resources at _runtime_, for a process that could just as easily be done at
+*compile* time. And that is what this Maven plugin attempts to address, allowing you to use a flexible classpath scanner
+that works at compile time.
+
+=== How it works
+
+The gencode scanner scans _source code_ - not compiled classes (at the moment). It will scan through packages
+ you tell it to scan through, matching criteria you tell it to match, and then puts discovered items into "groups".
+ Once it has finished, it hands the "groups" to templates you have defined - so you can do what you want with them.
+
+It does this because it allows each module (usually a Maven project) to provide generated classes
+ that contain the configuration necessary to use them.
+
+Consider the following:
+
+ - a library of Spring components, generating an interface or class that you could then use to tell Spring
+how to wire up the project - as if you did it by hand.
+ - a JAX-RS API containing a bunch of interfaces that you could automatically generate the client proxies for
+ - scan for all web resources (e.g. servlets and filters) and register them with the servlet container instead of
+   having the container have to scan for them
+
+Lets take a look from the sample app. Given the simplicity of the sample apps, it would probably not be worth
+using the plugin to automatically generate the configuration, but it is used for illustrative purposes in those
+applications.
+
+[source:xml]
+----
+<plugin>
+  <groupId>cd.connect.common</groupId>
+  <artifactId>connect-gen-code-scanner</artifactId>
+  <version>1.1</version>
+  <executions>
+    <execution>
+      <id>default</id>
+      <goals>
+        <goal>generate-sources</goal>
+      </goals>
+      <phase>generate-sources</phase>
+      <configuration>
+        <scanner>
+          <packages>
+            <package>cd.connect.samples.slackapp-r=spring: dao, security</package>
+            <package>cd.connect.samples.slackapp.rest=spring/@Singleton</package>
+            <package>cd.connect.samples.slackapp.rest-r=jerseyuser</package>
+          </packages>
+          <templates>
+            <template>
+              <name>slackapp-config</name>
+              <template>/generator/common-spring.mustache</template>
+              <joinGroup>spring, servlet</joinGroup>
+              <className>cd.connect.samples.slackapp.SlackAppGenConfig</className>
+            </template>
+            <template>
+              <name>slackapp-data-resource</name>
+              <template>/generator/jersey.mustache</template>
+              <className>cd.connect.samples.slackapp.JerseyDataConfig</className>
+              <joinGroup>jersey=jerseyuser</joinGroup>
+              <context>
+                <baseUrl>/data/*</baseUrl>
+              </context>
+            </template>
+
+          </templates>
+        </scanner>
+      </configuration>
+
+    </execution>
+  </executions>
+</plugin>
+----
+
+There are two sections here, `packages` and `templates`. There is a third, called `scans` but it is not detailed here
+(yet) as it is essentially a break-out of the `packages` section. During development `scans` collapsed into `packages`
+for most use cases.
+
+==== packages
+
+This section allows you to specify a path to scan, in essentially the format:
+
+package[-modifiers]=group[,group...]:[sub-package[,sub-package...]][/[@Annotations,...]
+
+modifiers:
+- r : do not recurse, when `-r` is seen, it means don't recurse into any further levels.
+
+If you had a code base who's primary base package was (say) `cd.connect.samples.slackapp`
+and you wished to grab all of the classes in the sub packages `dao`, `security` and `rest`
+and put them in the `spring` _group_, but no other sub-packages, you could do this:
+
+----
+<package>cd.connect.samples.slackapp=spring: dao, security, spring</package>
+----
+
+_groups_ are instances of the java `Set` class, so they won't duplicate. If you then wanted
+to ensure all of your @Singleton annotated classes were picked up as well, you could add
+
+----
+<package>cd.connect.samples.slackapp=spring: dao, security, spring</package>
+<package>cd.connect.samples.slackapp=spring/@Singleton</package>
+----
+
+if you know that all Jersey classes are also Spring classes, and they are in the rest package,
+you could do this:
+
+----
+<package>cd.connect.samples.slackapp.rest=spring, rest</package>
+----
+
+Later we will add the ability to add custom hand-off classes so you can have the scanner
+pass each class off to your processor, along with configuration that is relevant and
+have it store meta-data that will be available in your templates.
+
+==== templates
+
+The templates section just allows you to indicate which _groups_ you then want to hand off
+to a Mustache template. A _group_ consists of two fields:
+
+- types : the original Set
+- sortedTypes : the above sorted by name
+
+A type (is a shim over the top of the javaparser api's ReferenceTypeDeclaration which
+has a considerable amount of information). It also has an array of annotations, each of
+which contain a name/value pair of the fields of the annotation (if any).
+
+The group will turn up using its name unless you override it. Overriding it allows you to
+use the same template many times in your project for different groups.
+
+Taking the above example
+
+----
+<template>
+  <name>slackapp-config</name>
+  <template>/generator/common-spring.mustache</template>
+  <joinGroup>spring, servlet</joinGroup>
+  <className>cd.connect.samples.slackapp.SlackAppGenConfig</className>
+</template>
+----
+
+This will create a template that is:
+
+- name: called slackapp-config (the name is only used for error reporting
+and can be left out).
+- template: It specifies the template to use - this will be checked for on the classpath
+first, then it checks src/main/resources for that offset, and then src/test/resources
+- joinGroup: these are the groups that should be made available to the template, and are in the form
+`group[=name][,group[=name]...]`. So you could use `spring=components, servlet=web` above and
+instead of them turning up as variables called `spring` and `servlet`, they would turn up
+as `components` and `web`. This allows you to gather several groups of items that need to be
+generated in the same way, but require different actual groups. The jersey templates are often
+this way where you have different apis on different mount points, but you use one template.
+- className: the class you want generated into target/generate-sources from your template.
+
+An example template looks like this:
+
+[source: mustache]
+----
+package {{packageName}};
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
+{{#spring}}
+  // plain resources
+  {{#sortedTypes}}
+import {{packageName}}.{{name}};
+  {{/sortedTypes}}
+{{/spring}}
+
+@Configuration
+@Import({ {{#spring}}{{#sortedTypes}}{{name}}.class{{^-last}}, {{/-last}}{{/sortedTypes}}{{/spring}} })
+public class {{simpleName}} {
+}
+----
+
+This is a simple template that only manages Spring wiring, but if your app does a bunch of other things,
+it is worthwhile creating more useful templates and sharing them. Ours for example will register Spring
+objects, wire up servlets from their declared structures and others that generate Jersey servlet modules
+and register apis and implementations.
+
+Another example:
+
+----
+package {{packageName}};
+
+import java.util.stream.Stream;
+import cd.connect.spring.servlet.ServletModule;
+{{#spring}}
+  // plain resources
+  {{#sortedTypes}}
+import {{packageName}}.{{name}};
+  {{/sortedTypes}}
+{{/spring}}
+{{#servlet}}
+  // servlets that have WebServlet annotations
+  {{#sortedTypes}}
+import {{packageName}}.{{name}};
+  {{/sortedTypes}}
+{{/servlet}}
+{{#filter}}
+  // filters that have WebFilter annotations
+  {{#sortedTypes}}
+import {{packageName}}.{{name}};
+  {{/sortedTypes}}
+{{/filter}}
+
+public class {{simpleName}} extends ServletModule {
+  public void register() {
+  {{#spring}}
+    register(Stream.of(
+    {{#sortedTypes}}
+      {{name}}.class{{^-last}}, {{/-last}}
+    {{/sortedTypes}}
+    ));
+  {{/spring}}
+{{#servlet}}
+  // servlets that have WebServlet annotations
+  {{#sortedTypes}}
+    servlet({{name}}.class);
+  {{/sortedTypes}}
+{{/servlet}}
+{{#filter}}
+  // filters that have WebFilter annotations
+  {{#sortedTypes}}
+    filter({{name}}.class);
+  {{/sortedTypes}}
+{{/filter}}
+
+  }
+}
+----
+
+=== Closing notes
+
+We have found deliberate wiring in our Spring apps considerably decreases the startup time for those
+applications - 80 seconds down to 30. There are other techniques that can make your applications start
+faster as well.
+
+=== Limitations
+
+- This only works for Java source code. Other JVM languages will have to manually create their
+configuration until we extend this.
+- It is source code only because in most cases, you want to use the configuration discovered in the same package
+you discover it in. This means it needs to happen at the generate-sources phase.
+
+=== Future enhancements
+
+- Expand into compiled classes
+- Allowing you to specify interfaces vs classes for an individual package scan
+- Add support for a service loader to discover extensions so we can hand off and maintain extra meta-data.
+
+== Documentation
+There is no further specific documentation for this.
+
+The main documentation for link:http://connect.cd[Connect] can be found at: link:http://docs.connect.cd[docs.connect.cd]
+
+'''
+image::http://website.clearpoint.co.nz/connect/connect-logo-on-white-border.png[]
+link:http://connect.cd[Connect] is a Continuous Delivery Platform that gathers best practice approaches for deploying working software into the cloud with confidence.
+
+The main documentation for link:http://connect.cd[Connect] can be found at link:http://docs.connect.cd[docs.connect.cd]
+
+Any queries on the link:http://connect.cd[Connect] platform can be sent to: connect@clearpoint.co.nz
+
+
