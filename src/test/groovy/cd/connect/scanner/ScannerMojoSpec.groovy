@@ -16,7 +16,6 @@ class ScannerMojoSpec extends Specification {
 
 	private ScannerMojo setupMojo(Generator gen) {
 		ScannerMojo sm = new ScannerMojo(gen)
-		sm.projectDir = new File(".")
 		sm.javaOutFolder = new File("target/test-output")
 		sm.log = [info: { String msg -> println "DEBUG: $msg"}, debug: { String msg -> println msg},
 		          warn: { String msg -> println "WARN: $msg"}, error: { String msg, Throwable t -> println "ERROR: ${msg}"; t.printStackTrace()}] as Log

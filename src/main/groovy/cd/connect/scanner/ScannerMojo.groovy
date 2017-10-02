@@ -29,11 +29,7 @@ import groovy.transform.CompileStatic
 import org.apache.maven.plugin.AbstractMojo
 import org.apache.maven.plugin.MojoExecutionException
 import org.apache.maven.plugin.MojoFailureException
-import org.apache.maven.plugins.annotations.Component
-import org.apache.maven.plugins.annotations.LifecyclePhase
-import org.apache.maven.plugins.annotations.Mojo
-import org.apache.maven.plugins.annotations.Parameter
-import org.apache.maven.plugins.annotations.ResolutionScope
+import org.apache.maven.plugins.annotations.*
 import org.apache.maven.project.MavenProject
 import org.apache.maven.project.MavenProjectHelper
 
@@ -44,6 +40,7 @@ import java.lang.annotation.Annotation
  * @author Richard Vowles - https://plus.google.com/+RichardVowles
  */
 @CompileStatic
+
 @Mojo(name = "generate-sources",
 	defaultPhase = LifecyclePhase.GENERATE_SOURCES,
 	configurator = "include-project-dependencies",
@@ -66,9 +63,6 @@ class ScannerMojo extends AbstractMojo {
 
 	@Parameter(defaultValue = '${project.build.directory}/generated-sources/modules/')
 	File javaOutFolder
-
-	@Parameter(property = 'project.directory')
-	File projectDir
 
 	private final String TARGET_CLASSES = File.separator + "target" + File.separator + "classes"
 	private final String TARGET_CLASSES2 = File.separator + "target" + File.separator + "classes" + File.separator
@@ -130,9 +124,9 @@ class ScannerMojo extends AbstractMojo {
 		if (scanner.sourceBases == null) {
 			scanner.sourceBases = project.getCompileSourceRoots()
 		} else {
-			String projectPath = projectDir.absolutePath
+			String projectPath = project.basedir.absolutePath
 
-			scanner.sourceBases = scanner.sourceBases.collect({String sb -> sb.startsWith(projectPath) ? sb : new File(projectDir, sb).absolutePath})
+			scanner.sourceBases = scanner.sourceBases.collect({String sb -> sb.startsWith(projectPath) ? sb : new File(project.basedir, sb).absolutePath})
 		}
 	}
 
@@ -261,7 +255,7 @@ class ScannerMojo extends AbstractMojo {
 				name = File.separator + name;
 			}
 			// try local project directory src/main/resources
-			File f = new File(projectDir, "src/main/resources" + name);
+			File f = new File(project.basedir, "src/main/resources" + name);
 			getLog().info("looking in " + f.getAbsolutePath());
 			if (f.exists()) {
 				try {
@@ -274,7 +268,7 @@ class ScannerMojo extends AbstractMojo {
 
 		if (stream == null) {
 			// try local project directory src/test/resources
-			File f = new File(projectDir, "src/test/resources" + name);
+			File f = new File(project.basedir, "src/test/resources" + name);
 			if (f.exists()) {
 				try {
 					stream = new FileInputStream(f);
