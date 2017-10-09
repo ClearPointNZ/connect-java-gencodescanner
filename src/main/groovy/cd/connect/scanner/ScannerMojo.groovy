@@ -44,7 +44,7 @@ import java.lang.annotation.Annotation
 @Mojo(name = "generate-sources",
 	defaultPhase = LifecyclePhase.GENERATE_SOURCES,
 	configurator = "include-project-dependencies",
-	requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME)
+	requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME, threadSafe = true)
 class ScannerMojo extends AbstractMojo {
 	protected Map<String, CollectedGroup> groups = new HashMap<String, CollectedGroup>().withDefault { String key ->
 		return new CollectedGroup(name: key)
@@ -307,7 +307,7 @@ class ScannerMojo extends AbstractMojo {
 		if (!file.exists()) {
 			return false
 		}
-		
+
 		CompilationUnit cu = sourceCache[file];
 
 		if (cu.types == null) { // nothing in this file
