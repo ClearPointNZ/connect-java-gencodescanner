@@ -44,7 +44,8 @@ import java.lang.annotation.Annotation
 @Mojo(name = "generate-sources",
 	defaultPhase = LifecyclePhase.GENERATE_SOURCES,
 	configurator = "include-project-dependencies",
-	requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME, threadSafe = true)
+	requiresDependencyResolution = ResolutionScope.COMPILE_PLUS_RUNTIME, threadSafe = true,
+	instantiationStrategy = InstantiationStrategy.PER_LOOKUP)
 class ScannerMojo extends AbstractMojo {
 	protected Map<String, CollectedGroup> groups = new HashMap<String, CollectedGroup>().withDefault { String key ->
 		return new CollectedGroup(name: key)
